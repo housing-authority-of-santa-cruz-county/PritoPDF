@@ -79,7 +79,7 @@ OUTER:
     //pdf := gofpdf.New("P", "mm", "Letter", "")
     pdf := gofpdf.NewCustom(&gofpdf.InitType {
       UnitStr:  "pt",
-      Size: gofpdf.SizeType{Wd: 750, Ht: 1051},
+      Size: gofpdf.SizeType{Wd: 2550, Ht: 3506},
     })
     pdf.SetFont("Arial", "B", 16)
     for _, priGuid := range document.PriGuids {
@@ -99,7 +99,7 @@ OUTER:
           continue OUTER
         }
         log.Println(image.Height)
-        pdf.ImageOptions(priGuid+".png",0,0,750,1051,true,opt, 0, "")
+        pdf.ImageOptions(priGuid+".png",0,0,2550,3506,true,opt, 0, "")
       }
       //pdf.AddPage()
     }
