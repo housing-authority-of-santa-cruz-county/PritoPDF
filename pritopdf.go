@@ -10,6 +10,7 @@ import (
   "strconv"
   "github.com/jung-kurt/gofpdf"
   "image"
+  "github.com/disintegration/imaging"
 )
 const (
   layoutPri = "2006-01-02 15:04:05.000"
@@ -71,45 +72,68 @@ func main() {
     }
 
   }
-  //fmt.Printf("%v",Documents[0])
+
   //Main loop
 OUTER:
   for _, document := range Documents {
     fmt.Printf("S8Guid: %v\r\n", document.S8Guid)
-    //pdf := gofpdf.New("P", "mm", "Letter", "")
+    //pdf := gofpdf.New("L", "pt", "Letter", "")
+    startPriGuid := document.PriGuids[0]
+    existingImageFile, err := os.Open(startPriGuid+".png")
+    defer existingImageFile.Close();
+    if (err != nil) {
+      log.Println("Can't open "+startPriGuid+".png - Aborting "+document.S8Guid)
+      continue OUTER
+    }
+    curImage, _, err := image.DecodeConfig(existingImageFile)
+    if err != nil {
+      log.Println(startPriGuid+".png - Aborting "+document.S8Guid, err)
+      continue OUTER
+    }
     pdf := gofpdf.NewCustom(&gofpdf.InitType {
       UnitStr:  "pt",
-      Size: gofpdf.SizeType{Wd: 2550, Ht: 3506},
+      Size: gofpdf.SizeType{Wd: float64(curImage.Width), Ht: float64(curImage.Height)},
+      OrientationStr: "P",
     })
     pdf.SetFont("Arial", "B", 16)
-    for _, priGuid := range document.PriGuids {
-      pdf.SetX(0)
-      fmt.Printf("%v\r\n",priGuid)
-      var opt gofpdf.ImageOptions
-      opt.ImageType = "png"
-      existingImageFile, err := os.Open(priGuid+".png")
-      defer existingImageFile.Close();
-      if (err != nil) {
-        log.Println("Can't open "+priGuid+".png - Aborting "+document.S8Guid)
-        continue OUTER
-      } else {
-        image, _, err := image.DecodeConfig(existingImageFile)
+
+    //pdf.AddPageFormat("L", gofpdf.SizeType{Wd: float64(curImage.Width), Ht: float64(curImage.Height)})
+    for idx, priGuid := range document.PriGuids {
+      //if idx > 0 {
+        existingImageFile, err := os.Open(priGuid+".png")
+        defer existingImageFile.Close();
+        if (err != nil) {
+          log.Println("Can't open "+priGuid+".png - Aborting "+document.S8Guid)
+          continue OUTER
+        }
+        curImage, _, err := image.DecodeConfig(existingImageFile)
         if err != nil {
           log.Println(priGuid+".png - Aborting "+document.S8Guid, err)
           continue OUTER
         }
-        log.Println(image.Height)
-        pdf.ImageOptions(priGuid+".png",0,0,2550,3506,true,opt, 0, "")
-      }
-      //pdf.AddPage()
+
+        src, err := imaging.Open(priGuid+".png")
+        if err != nil {
+          log.Fatalf("failed to open image: %v", err)
+        }
+        if (curImage.Width > curImage.Height) {
+          src = imaging.Rotate90(src)
+        }
+        err = imaging.Save(src, priGuid+".jpg")
+        if err != nil {
+          log.Fatalf("failed to save image: %v", err)
+        }
+
+        pdf.AddPageFormat("P", gofpdf.SizeType{Wd: float64(curImage.Width), Ht: float64(curImage.Height)})
+      //}
+      //pdf.SetX(0)
+      wd, ht, u := pdf.PageSize(idx)
+      log.Println("", idx, wd, u, ht, u)
+      fmt.Printf("%v\r\n",priGuid)
+      var opt gofpdf.ImageOptions
+      opt.ImageType = "jpg"
+      pdf.ImageOptions(priGuid+".jpg",0,0,float64(curImage.Width),float64(curImage.Height),false,opt, 0, "")
     }
     pdf.OutputFileAndClose(document.S8Guid+".pdf")
   }
-
-/*  pdf := gofpdf.New("P", "mm", "A4", "")
-  pdf.AddPage()
-  pdf.SetFont("Arial", "B", 16)
-  pdf.Cell(40, 10, "Hello, world")
-  pdf.OutputFileAndClose("hello.pdf")
-*/
 }
