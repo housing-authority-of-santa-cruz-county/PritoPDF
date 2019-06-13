@@ -72,7 +72,12 @@ func main() {
     }
 
   }
+  f, err := os.Create("failed.txt")
+  if err != nil {
+    panic(err)
+  }
 
+  w := bufio.NewWriter(f)
   //Main loop
 OUTER:
   for _, document := range Documents {
@@ -88,6 +93,11 @@ OUTER:
     curImage, _, err := image.DecodeConfig(existingImageFile)
     if err != nil {
       log.Println(startPriGuid+".png - Aborting "+document.S8Guid, err)
+      _, err := w.WriteString("Can't decode "+startPriGuid+".png - Aborting "+document.S8Guid+"\n")
+      if err != nil {
+        panic(err)
+      }
+      w.Flush()
       continue OUTER
     }
     pdf := gofpdf.NewCustom(&gofpdf.InitType {
@@ -104,24 +114,47 @@ OUTER:
         defer existingImageFile.Close();
         if (err != nil) {
           log.Println("Can't open "+priGuid+".png - Aborting "+document.S8Guid)
+          _, err := w.WriteString("Can't open "+priGuid+".png - Aborting "+document.S8Guid+"\n")
+          if err != nil {
+            panic(err)
+          }
+          w.Flush()
           continue OUTER
         }
         curImage, _, err := image.DecodeConfig(existingImageFile)
         if err != nil {
           log.Println(priGuid+".png - Aborting "+document.S8Guid, err)
+          _, err := w.WriteString("Can't Decode "+priGuid+".png - Aborting "+document.S8Guid+"\n")
+          if err != nil {
+            panic(err)
+          }
+          w.Flush()
           continue OUTER
         }
 
         src, err := imaging.Open(priGuid+".png")
         if err != nil {
-          log.Fatalf("failed to open image: %v", err)
+          log.Println("failed to open image "+ priGuid +": %v", err)
+          log.Println("Aborting "+document.S8Guid)
+          _, err := w.WriteString("failed to open "+priGuid+".png - Aborting "+document.S8Guid+"\n")
+          if err != nil {
+            panic(err)
+          }
+          w.Flush()
+          continue OUTER
         }
         if (curImage.Width > curImage.Height) {
           src = imaging.Rotate90(src)
         }
         err = imaging.Save(src, priGuid+".jpg")
         if err != nil {
-          log.Fatalf("failed to save image: %v", err)
+          log.Println("failed to save image: %v", err)
+          _, err := w.WriteString("failed to save image "+priGuid+".jpg - Aborting "+document.S8Guid+"\n")
+          if err != nil {
+            panic(err)
+          }
+          w.Flush()
+          continue OUTER
         }
 
         pdf.AddPageFormat("P", gofpdf.SizeType{Wd: float64(curImage.Width), Ht: float64(curImage.Height)})
